@@ -12,6 +12,10 @@ public final class HomeAssistantServices {
     private static final HomeAssistantPollingService POLLING_SERVICE =
         new HomeAssistantPollingService(TRANSPORT_MANAGER, ENTITY_STATE_CACHE);
 
+    static {
+        TRANSPORT_MANAGER.setStateUpdateListener(ENTITY_STATE_CACHE::updateState);
+    }
+
     private HomeAssistantServices() {
     }
 

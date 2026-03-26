@@ -38,4 +38,12 @@ public final class HomeAssistantConnectionSettings {
         String encodedEntityId = URLEncoder.encode(entityId, StandardCharsets.UTF_8).replace("+", "%20");
         return URI.create(root + "/api/states/" + encodedEntityId);
     }
+
+    public URI websocketEndpoint() {
+        String scheme = "https".equalsIgnoreCase(baseUri.getScheme()) ? "wss" : "ws";
+        String host = baseUri.getHost();
+        int port = baseUri.getPort();
+        String authority = port >= 0 ? host + ":" + port : host;
+        return URI.create(scheme + "://" + authority + "/api/websocket");
+    }
 }

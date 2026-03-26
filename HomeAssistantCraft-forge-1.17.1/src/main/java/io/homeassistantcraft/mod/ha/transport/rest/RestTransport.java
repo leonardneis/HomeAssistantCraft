@@ -13,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.function.BiConsumer;
 import java.util.Optional;
 
 public final class RestTransport implements HomeAssistantTransport {
@@ -47,6 +48,11 @@ public final class RestTransport implements HomeAssistantTransport {
     @Override
     public TransportState state() {
         return state;
+    }
+
+    @Override
+    public void setStateUpdateListener(BiConsumer<String, String> stateUpdateListener) {
+        // REST transport is pull-based and does not emit push state updates.
     }
 
     @Override

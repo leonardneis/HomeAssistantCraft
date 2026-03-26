@@ -4,10 +4,13 @@ import io.homeassistantcraft.mod.ha.HomeAssistantConnectionSettings;
 import io.homeassistantcraft.mod.ha.model.ServiceCall;
 import io.homeassistantcraft.mod.ha.model.ServiceCallResult;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 
 public final class TransportManager {
     private final HomeAssistantTransport primary;
     private final HomeAssistantTransport fallback;
+    private BiConsumer<String, String> stateUpdateListener = (entityId, state) -> {
+    };
 
     private TransportMode activeMode = TransportMode.NONE;
     private String lastFallbackReason = "none";
@@ -15,6 +18,16 @@ public final class TransportManager {
     public TransportManager(HomeAssistantTransport primary, HomeAssistantTransport fallback) {
         this.primary = primary;
         this.fallback = fallback;
+
+        this.primary.setStateUpdateListener((entityId, state) ->
+            onTransportStateUpdate(primary.mode(), entityId, state));
+        this.fallback.setStateUpdateListener((entityId, state) ->
+            onTransportStateUpdate(fallback.mode(), entityId, state));
+    }
+
+    public synchronized void setStateUpdateListener(BiConsumer<String, String> stateUpdateListener) {
+        this.stateUpdateListener = stateUpdateListener == null ? (entityId, state) -> {
+        } : stateUpdateListener;
     }
 
     public synchronized void connect(HomeAssistantConnectionSettings settings) {
@@ -113,5 +126,15 @@ public final class TransportManager {
         return "active=" + activeMode.name().toLowerCase() + ", "
             + primary.statusSummary() + ", "
             + fallback.statusSummary();
+    }
+
+    private synchronized void onTransportStateUpdate(TransportMode source, String entityId, String state) {
+        if (entityId == null || entityId.isBlank() || state == null) {
+            return;
+        }
+
+        if (source == TransportMode.WEBSOCKET || source == activeMode) {
+            stateUpdateListener.accept(entityId, state);
+        }
     }
 }
