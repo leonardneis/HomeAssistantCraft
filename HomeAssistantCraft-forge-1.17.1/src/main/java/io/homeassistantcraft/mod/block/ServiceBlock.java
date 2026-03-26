@@ -1,20 +1,28 @@
 package io.homeassistantcraft.mod.block;
 
 import io.homeassistantcraft.mod.block.entity.ServiceBlockEntity;
+import io.homeassistantcraft.mod.debug.DebugSettings;
 import io.homeassistantcraft.mod.ha.model.ServiceCall;
 import io.homeassistantcraft.mod.ha.model.ServiceCallResult;
 import io.homeassistantcraft.mod.init.ModBlockEntities;
 import io.homeassistantcraft.mod.runtime.HomeAssistantServices;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.BaseEntityBlock;
+import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
-import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.network.chat.TextComponent;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import org.apache.logging.log4j.LogManager;
@@ -70,6 +78,45 @@ public final class ServiceBlock extends BaseEntityBlock {
     }
 
     @Override
+    public RenderShape getRenderShape(BlockState state) {
+        return RenderShape.MODEL;
+    }
+
+    @Override
+    public InteractionResult use(
+        BlockState state,
+        Level level,
+        BlockPos pos,
+        Player player,
+        InteractionHand hand,
+        BlockHitResult hit
+    ) {
+        if (level.isClientSide) {
+            return InteractionResult.sidedSuccess(true);
+        }
+
+        ServiceBlockEntity serviceBlockEntity = getServiceBlockEntity(level, pos);
+        if (serviceBlockEntity == null) {
+            player.sendMessage(new TextComponent("ServiceBlock: missing config entity"), Util.NIL_UUID);
+            return InteractionResult.CONSUME;
+        }
+
+        String configMessage = "ServiceBlock: " + serviceBlockEntity.domain() + "."
+            + serviceBlockEntity.service() + " -> " + serviceBlockEntity.entityId();
+        player.sendMessage(new TextComponent(configMessage), Util.NIL_UUID);
+
+        if (player.isShiftKeyDown()) {
+            Long lastTriggerTick = LAST_TRIGGER_TICK.get(cooldownKey(level, pos));
+            String triggerMessage = lastTriggerTick == null
+                ? "ServiceBlock: never triggered"
+                : "ServiceBlock: last trigger tick=" + lastTriggerTick;
+            player.sendMessage(new TextComponent(triggerMessage), Util.NIL_UUID);
+        }
+
+        return InteractionResult.CONSUME;
+    }
+
+    @Override
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return ModBlockEntities.SERVICE_BLOCK_ENTITY.get().create(pos, state);
     }
@@ -107,7 +154,10 @@ public final class ServiceBlock extends BaseEntityBlock {
     private void triggerServiceCall(Level level, BlockPos pos) {
         ServiceBlockEntity serviceBlockEntity = getServiceBlockEntity(level, pos);
         if (serviceBlockEntity == null) {
-            LOGGER.warn("ServiceBlock trigger failed at {}: missing block entity", pos);
+            if (DebugSettings.isEnabled()) {
+                LOGGER.warn("ServiceBlock trigger failed at {}: missing block entity", pos);
+                DebugSettings.broadcastToPlayers(level, "HA call failed: missing ServiceBlockEntity at " + pos);
+            }
             return;
         }
 
@@ -124,26 +174,38 @@ public final class ServiceBlock extends BaseEntityBlock {
 
         ServiceCallResult result = HomeAssistantServices.transportManager().callService(call);
         if (result.success()) {
-            LOGGER.info(
-                "ServiceBlock trigger at {}: {}.{} -> {} via {}",
+            if (DebugSettings.isEnabled()) {
+                LOGGER.info(
+                    "ServiceBlock trigger at {}: {}.{} -> {} via {}",
+                    pos,
+                    domain,
+                    service,
+                    entityId,
+                    result.mode().name().toLowerCase()
+                );
+                DebugSettings.broadcastToPlayers(
+                    level,
+                    "HA call success: " + domain + "." + service + " -> " + entityId
+                );
+            }
+            return;
+        }
+
+        if (DebugSettings.isEnabled()) {
+            LOGGER.warn(
+                "ServiceBlock trigger failed at {}: {}.{} -> {} (mode={} reason={})",
                 pos,
                 domain,
                 service,
                 entityId,
-                result.mode().name().toLowerCase()
+                result.mode().name().toLowerCase(),
+                result.message()
             );
-            return;
+            DebugSettings.broadcastToPlayers(
+                level,
+                "HA call failed: " + domain + "." + service + " -> " + entityId + " | " + result.message()
+            );
         }
-
-        LOGGER.warn(
-            "ServiceBlock trigger failed at {}: {}.{} -> {} (mode={} reason={})",
-            pos,
-            domain,
-            service,
-            entityId,
-            result.mode().name().toLowerCase(),
-            result.message()
-        );
     }
 
     private static ServiceBlockEntity getServiceBlockEntity(Level level, BlockPos pos) {

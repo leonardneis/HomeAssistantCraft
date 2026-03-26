@@ -6,18 +6,23 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import io.homeassistantcraft.mod.HomeAssistantCraftMod;
 import io.homeassistantcraft.mod.block.entity.ServiceBlockEntity;
+import io.homeassistantcraft.mod.debug.DebugSettings;
 import io.homeassistantcraft.mod.init.ModBlocks;
 import io.homeassistantcraft.mod.runtime.HomeAssistantServices;
 import net.minecraft.core.BlockPos;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.TextComponent;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.ForgeRegistries;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -46,7 +51,17 @@ public final class CommandRegistrationEvents {
                             .then(Commands.argument("domain", StringArgumentType.word())
                                 .then(Commands.argument("service", StringArgumentType.word())
                                     .then(Commands.argument("entity_id", StringArgumentType.word())
-                                        .executes(CommandRegistrationEvents::runSetServiceBlockConfig)))))))));
+                                        .executes(CommandRegistrationEvents::runSetServiceBlockConfig))))))))
+            .then(Commands.literal("settarget")
+                .then(Commands.argument("domain", StringArgumentType.word())
+                    .then(Commands.argument("service", StringArgumentType.word())
+                        .then(Commands.argument("entity_id", StringArgumentType.word())
+                            .executes(CommandRegistrationEvents::runSetServiceBlockConfigFromTarget)))))
+            .then(Commands.literal("debug")
+                .then(Commands.literal("on")
+                    .executes(context -> runSetDebug(context, true)))
+                .then(Commands.literal("off")
+                    .executes(context -> runSetDebug(context, false)))));
     }
 
     private static int runStatus(CommandContext<CommandSourceStack> context) {
@@ -69,7 +84,33 @@ public final class CommandRegistrationEvents {
         String service = StringArgumentType.getString(context, "service");
         String entityId = StringArgumentType.getString(context, "entity_id");
 
-        BlockPos pos = new BlockPos(x, y, z);
+        return applyServiceBlockConfig(context, new BlockPos(x, y, z), domain, service, entityId);
+    }
+
+    private static int runSetServiceBlockConfigFromTarget(CommandContext<CommandSourceStack> context) {
+        String domain = StringArgumentType.getString(context, "domain");
+        String service = StringArgumentType.getString(context, "service");
+        String entityId = StringArgumentType.getString(context, "entity_id");
+
+        BlockPos targetPos = findLookedAtServiceBlock(context.getSource());
+        if (targetPos == null) {
+            context.getSource().sendFailure(new TextComponent(
+                "hac set failed: look directly at a ServiceBlock within 20 blocks or use /hac set <x> <y> <z> ..."
+            ));
+            return 0;
+        }
+
+        return applyServiceBlockConfig(context, targetPos, domain, service, entityId);
+    }
+
+    private static int applyServiceBlockConfig(
+        CommandContext<CommandSourceStack> context,
+        BlockPos pos,
+        String domain,
+        String service,
+        String entityId
+    ) {
+
         Level level = context.getSource().getLevel();
 
         if (!level.isLoaded(pos)) {
@@ -78,9 +119,14 @@ public final class CommandRegistrationEvents {
             return 0;
         }
 
-        if (!level.getBlockState(pos).is(ModBlocks.SERVICE_BLOCK.get())) {
-            context.getSource().sendFailure(new TextComponent("hac set failed: no ServiceBlock at " + pos));
-            LOGGER.warn("hac set failed at {}: target is not ServiceBlock", pos);
+        BlockState blockState = level.getBlockState(pos);
+        if (!blockState.is(ModBlocks.SERVICE_BLOCK.get())) {
+            String foundBlockId = String.valueOf(ForgeRegistries.BLOCKS.getKey(blockState.getBlock()));
+            context.getSource().sendFailure(new TextComponent(
+                "hac set failed: no ServiceBlock at " + pos + " (found " + foundBlockId
+                    + "). Tip: use F3 Targeted Block coords or /hac settarget <domain> <service> <entity_id>"
+            ));
+            LOGGER.warn("hac set failed at {}: target is not ServiceBlock (found {})", pos, foundBlockId);
             return 0;
         }
 
@@ -92,12 +138,43 @@ public final class CommandRegistrationEvents {
         }
 
         serviceBlockEntity.setConfiguration(domain, service, entityId);
-        level.sendBlockUpdated(pos, level.getBlockState(pos), level.getBlockState(pos), Block.UPDATE_ALL);
+        level.sendBlockUpdated(pos, blockState, blockState, net.minecraft.world.level.block.Block.UPDATE_ALL);
 
         String message = "hac set success at " + pos + ": " + serviceBlockEntity.domain()
             + "." + serviceBlockEntity.service() + " -> " + serviceBlockEntity.entityId();
         context.getSource().sendSuccess(new TextComponent(message), true);
         LOGGER.info(message);
+        return 1;
+    }
+
+    private static BlockPos findLookedAtServiceBlock(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            return null;
+        }
+
+        HitResult hitResult = player.pick(20.0D, 0.0F, false);
+        if (!(hitResult instanceof BlockHitResult blockHitResult)) {
+            return null;
+        }
+
+        BlockPos pos = blockHitResult.getBlockPos();
+        Level level = source.getLevel();
+        if (!level.isLoaded(pos)) {
+            return null;
+        }
+
+        if (!level.getBlockState(pos).is(ModBlocks.SERVICE_BLOCK.get())) {
+            return null;
+        }
+
+        return pos;
+    }
+
+    private static int runSetDebug(CommandContext<CommandSourceStack> context, boolean enabled) {
+        DebugSettings.setEnabled(enabled);
+        String message = "hac debug " + (enabled ? "on" : "off");
+        context.getSource().sendSuccess(new TextComponent(message), true);
+        LOGGER.info("Debug logging toggled: {}", enabled ? "on" : "off");
         return 1;
     }
 }

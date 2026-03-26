@@ -1,6 +1,7 @@
 package io.homeassistantcraft.mod.block;
 
 import io.homeassistantcraft.mod.config.ModConfigs;
+import io.homeassistantcraft.mod.debug.DebugSettings;
 import io.homeassistantcraft.mod.ha.transport.TransportMode;
 import io.homeassistantcraft.mod.runtime.HomeAssistantServices;
 import java.util.Optional;
@@ -70,14 +71,20 @@ public final class StateBlock extends Block {
         int targetPower = cachedState.isPresent() && "on".equalsIgnoreCase(cachedState.get()) ? 15 : 0;
 
         if (state.getValue(POWER) != targetPower) {
-            LOGGER.info(
-                "StateBlock power update at {}: {} -> {} (entity={} state={})",
-                pos,
-                state.getValue(POWER),
-                targetPower,
-                HARDCODED_ENTITY_ID,
-                cachedState.orElse("<missing>")
-            );
+            if (DebugSettings.isEnabled()) {
+                LOGGER.info(
+                    "StateBlock power update at {}: {} -> {} (entity={} state={})",
+                    pos,
+                    state.getValue(POWER),
+                    targetPower,
+                    HARDCODED_ENTITY_ID,
+                    cachedState.orElse("<missing>")
+                );
+                DebugSettings.broadcastToPlayers(
+                    level,
+                    "HA state update: " + HARDCODED_ENTITY_ID + " = " + cachedState.orElse("<missing>")
+                );
+            }
             level.setBlock(pos, state.setValue(POWER, targetPower), Block.UPDATE_ALL);
         }
 
