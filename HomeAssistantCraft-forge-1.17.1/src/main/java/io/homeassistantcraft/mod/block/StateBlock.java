@@ -13,12 +13,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.IntegerProperty;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public final class StateBlock extends Block {
-    private static final Logger LOGGER = LogManager.getLogger();
-
     private static final int POLL_INTERVAL_TICKS = 20;
     private static final String HARDCODED_ENTITY_ID = "light.living_room";
 
@@ -33,6 +29,7 @@ public final class StateBlock extends Block {
     public void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean isMoving) {
         super.onPlace(state, level, pos, oldState, isMoving);
         if (!level.isClientSide && !state.is(oldState.getBlock())) {
+            HomeAssistantServices.pollingService().trackEntity(HARDCODED_ENTITY_ID);
             level.getBlockTicks().scheduleTick(pos, this, 1);
         }
     }
@@ -54,16 +51,10 @@ public final class StateBlock extends Block {
 
     @Override
     public void tick(BlockState state, ServerLevel level, BlockPos pos, Random random) {
-        int targetPower = 0;
+        HomeAssistantServices.pollingService().trackEntity(HARDCODED_ENTITY_ID);
 
-        try {
-            Optional<String> haState = HomeAssistantServices.transportManager().fetchEntityState(HARDCODED_ENTITY_ID);
-            if (haState.isPresent() && "on".equalsIgnoreCase(haState.get())) {
-                targetPower = 15;
-            }
-        } catch (Exception ex) {
-            LOGGER.warn("State Block polling failed at {}: {}", pos, ex.getMessage());
-        }
+        Optional<String> cachedState = HomeAssistantServices.entityStateCache().getState(HARDCODED_ENTITY_ID);
+        int targetPower = cachedState.isPresent() && "on".equalsIgnoreCase(cachedState.get()) ? 15 : 0;
 
         if (state.getValue(POWER) != targetPower) {
             level.setBlock(pos, state.setValue(POWER, targetPower), Block.UPDATE_ALL);

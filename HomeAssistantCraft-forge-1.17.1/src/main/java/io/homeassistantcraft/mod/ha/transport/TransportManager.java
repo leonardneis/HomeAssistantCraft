@@ -4,12 +4,8 @@ import io.homeassistantcraft.mod.ha.HomeAssistantConnectionSettings;
 import io.homeassistantcraft.mod.ha.model.ServiceCall;
 import io.homeassistantcraft.mod.ha.model.ServiceCallResult;
 import java.util.Optional;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public final class TransportManager {
-    private static final Logger LOGGER = LogManager.getLogger();
-
     private final HomeAssistantTransport primary;
     private final HomeAssistantTransport fallback;
 
@@ -70,30 +66,25 @@ public final class TransportManager {
         return ServiceCallResult.fail(TransportMode.NONE, "transport manager is not connected");
     }
 
-    public synchronized Optional<String> fetchEntityState(String entityId) {
+    public synchronized Optional<String> getState(String entityId) {
         if (activeMode == primary.mode()) {
-            Optional<String> primaryState = primary.fetchEntityState(entityId);
+            Optional<String> primaryState = primary.getState(entityId);
             if (primaryState.isPresent()) {
                 return primaryState;
             }
 
-            Optional<String> fallbackState = fallback.fetchEntityState(entityId);
+            Optional<String> fallbackState = fallback.getState(entityId);
             if (fallbackState.isPresent()) {
                 activeMode = fallback.mode();
                 lastFallbackReason = "primary state read unavailable";
                 return fallbackState;
             }
-
-            LOGGER.warn("Failed to read Home Assistant entity state '{}' from both transports", entityId);
             return Optional.empty();
         }
 
         if (activeMode == fallback.mode()) {
-            Optional<String> fallbackState = fallback.fetchEntityState(entityId);
-            return fallbackState;
+            return fallback.getState(entityId);
         }
-
-        LOGGER.debug("Transport manager is not connected; cannot read Home Assistant entity state '{}'", entityId);
         return Optional.empty();
     }
 

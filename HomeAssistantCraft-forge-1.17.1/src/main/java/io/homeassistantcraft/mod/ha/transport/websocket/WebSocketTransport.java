@@ -32,7 +32,7 @@ public final class WebSocketTransport implements HomeAssistantTransport {
     }
 
     @Override
-    public Optional<String> fetchEntityState(String entityId) {
+    public Optional<String> getState(String entityId) {
         return Optional.empty();
     }
 

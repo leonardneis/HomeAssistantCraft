@@ -19,14 +19,18 @@ public final class ServerLifecycleEvents {
     public static void onServerStarted(FMLServerStartedEvent event) {
         Optional<HomeAssistantConnectionSettings> settings = ModConfigs.resolveSettings();
         if (settings.isEmpty()) {
+            HomeAssistantServices.transportManager().disconnect();
+            HomeAssistantServices.pollingService().stop();
             return;
         }
 
         HomeAssistantServices.transportManager().connect(settings.get());
+        HomeAssistantServices.pollingService().start();
     }
 
     @SubscribeEvent
     public static void onServerStopping(FMLServerStoppingEvent event) {
+        HomeAssistantServices.pollingService().stop();
         HomeAssistantServices.transportManager().disconnect();
         HomeAssistantServices.entityStateCache().clear();
     }

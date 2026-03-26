@@ -9,6 +9,8 @@ public final class HomeAssistantServices {
     private static final EntityStateCache ENTITY_STATE_CACHE = new EntityStateCache();
     private static final TransportManager TRANSPORT_MANAGER =
         new TransportManager(new WebSocketTransport(), new RestTransport());
+    private static final HomeAssistantPollingService POLLING_SERVICE =
+        new HomeAssistantPollingService(TRANSPORT_MANAGER, ENTITY_STATE_CACHE);
 
     private HomeAssistantServices() {
     }
@@ -19,5 +21,9 @@ public final class HomeAssistantServices {
 
     public static TransportManager transportManager() {
         return TRANSPORT_MANAGER;
+    }
+
+    public static HomeAssistantPollingService pollingService() {
+        return POLLING_SERVICE;
     }
 }

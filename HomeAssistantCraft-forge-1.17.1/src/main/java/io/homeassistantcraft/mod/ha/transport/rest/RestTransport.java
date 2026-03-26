@@ -14,12 +14,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Optional;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 public final class RestTransport implements HomeAssistantTransport {
     private static final Gson GSON = new Gson();
-    private static final Logger LOGGER = LogManager.getLogger();
 
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(8))
@@ -53,8 +50,8 @@ public final class RestTransport implements HomeAssistantTransport {
     }
 
     @Override
-    public Optional<String> fetchEntityState(String entityId) {
-        if (state != TransportState.READY || settings == null) {
+    public Optional<String> getState(String entityId) {
+        if (state == TransportState.DISCONNECTED || settings == null) {
             return Optional.empty();
         }
 
@@ -70,7 +67,6 @@ public final class RestTransport implements HomeAssistantTransport {
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
                 lastError = "http " + response.statusCode() + ": " + response.body();
                 state = TransportState.DEGRADED;
-                LOGGER.warn("REST fetchEntityState failed for '{}': {}", entityId, lastError);
                 return Optional.empty();
             }
 
@@ -78,10 +74,10 @@ public final class RestTransport implements HomeAssistantTransport {
             if (responseJson == null || !responseJson.has("state") || responseJson.get("state").isJsonNull()) {
                 lastError = "invalid response body";
                 state = TransportState.DEGRADED;
-                LOGGER.warn("REST fetchEntityState returned invalid payload for '{}': {}", entityId, response.body());
                 return Optional.empty();
             }
 
+            state = TransportState.READY;
             return Optional.of(responseJson.get("state").getAsString());
         } catch (IOException | InterruptedException ex) {
             if (ex instanceof InterruptedException) {
@@ -89,14 +85,13 @@ public final class RestTransport implements HomeAssistantTransport {
             }
             lastError = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
             state = TransportState.DEGRADED;
-            LOGGER.warn("REST fetchEntityState error for '{}': {}", entityId, lastError);
             return Optional.empty();
         }
     }
 
     @Override
     public ServiceCallResult callService(ServiceCall serviceCall) {
-        if (state != TransportState.READY || settings == null) {
+        if (state == TransportState.DISCONNECTED || settings == null) {
             return ServiceCallResult.fail(mode(), "rest transport is not connected");
         }
 
@@ -118,6 +113,7 @@ public final class RestTransport implements HomeAssistantTransport {
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() >= 200 && response.statusCode() < 300) {
+                state = TransportState.READY;
                 return ServiceCallResult.ok(mode());
             }
             lastError = "http " + response.statusCode() + ": " + response.body();

@@ -14,7 +14,7 @@ public interface HomeAssistantTransport {
 
     TransportState state();
 
-    Optional<String> fetchEntityState(String entityId);
+    Optional<String> getState(String entityId);
 
     ServiceCallResult callService(ServiceCall serviceCall);
 
