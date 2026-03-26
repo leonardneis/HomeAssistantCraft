@@ -61,6 +61,18 @@ function sendStateChanged(entityId) {
   );
 }
 
+function toggleEntity(entityId) {
+  if (!entities.has(entityId)) {
+    entities.set(entityId, 'off');
+  }
+
+  const current = entities.get(entityId) || 'off';
+  const next = current === 'on' ? 'off' : 'on';
+  entities.set(entityId, next);
+  sendStateChanged(entityId);
+  return next;
+}
+
 // Real HA-like endpoint used by many clients/mods.
 app.get('/api/states/:entityId', (req, res) => {
   const entityId = decodeURIComponent(req.params.entityId);
@@ -88,16 +100,27 @@ app.post('/toggle', (req, res) => {
       ? String(req.body.entity_id)
       : 'light.living_room';
 
-  if (!entities.has(entityId)) {
-    entities.set(entityId, 'off');
-  }
-
-  const current = entities.get(entityId) || 'off';
-  const next = current === 'on' ? 'off' : 'on';
-  entities.set(entityId, next);
-
-  sendStateChanged(entityId);
+  const next = toggleEntity(entityId);
   res.json({ ok: true, entity_id: entityId, state: next });
+});
+
+// HA-compatible service path used by the mod transport layer.
+app.post('/api/services/light/toggle', (req, res) => {
+  const entityId =
+    req.body?.target?.entity_id ||
+    req.body?.data?.entity_id ||
+    req.body?.entity_id ||
+    'light.living_room';
+
+  const normalizedEntityId = String(entityId);
+  const next = toggleEntity(normalizedEntityId);
+
+  res.json([
+    {
+      entity_id: normalizedEntityId,
+      state: next,
+    },
+  ]);
 });
 
 const server = http.createServer(app);

@@ -1,6 +1,7 @@
 package io.homeassistantcraft.mod.init;
 
 import io.homeassistantcraft.mod.HomeAssistantCraftMod;
+import io.homeassistantcraft.mod.block.ServiceBlock;
 import io.homeassistantcraft.mod.block.StateBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
@@ -17,8 +18,8 @@ public final class ModBlocks {
     public static final RegistryObject<Block> STATE_BLOCK = BLOCKS.register("state_block",
         () -> new StateBlock(BlockBehaviour.Properties.of(Material.METAL).strength(2.0F)));
 
-    public static final RegistryObject<Block> DEV_TEST_BLOCK = BLOCKS.register("dev_test_block",
-        () -> new Block(BlockBehaviour.Properties.of(Material.STONE).strength(1.5F)));
+    public static final RegistryObject<Block> SERVICE_BLOCK = BLOCKS.register("service_block",
+        () -> new ServiceBlock(BlockBehaviour.Properties.of(Material.METAL).strength(2.0F)));
 
     private ModBlocks() {
     }

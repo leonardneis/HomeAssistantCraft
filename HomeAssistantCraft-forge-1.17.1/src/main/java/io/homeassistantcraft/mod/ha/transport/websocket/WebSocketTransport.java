@@ -30,6 +30,7 @@ public final class WebSocketTransport implements HomeAssistantTransport {
 
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(10))
+        .version(HttpClient.Version.HTTP_1_1)
         .build();
 
     private final ScheduledExecutorService reconnectExecutor =

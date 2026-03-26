@@ -1,5 +1,5 @@
 {
   "block.homeassistantcraft.state_block": "State Block",
-  "block.homeassistantcraft.dev_test_block": "Dev Test Block",
+  "block.homeassistantcraft.service_block": "Service Block",
   "itemGroup.homeassistantcraft": "HomeAssistantCraft"
 }

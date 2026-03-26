@@ -21,6 +21,7 @@ public final class RestTransport implements HomeAssistantTransport {
 
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(8))
+        .version(HttpClient.Version.HTTP_1_1)
         .build();
 
     private HomeAssistantConnectionSettings settings;
@@ -61,7 +62,9 @@ public final class RestTransport implements HomeAssistantTransport {
             return Optional.empty();
         }
 
-        HttpRequest request = HttpRequest.newBuilder(settings.stateEndpoint(entityId))
+        var endpoint = settings.stateEndpoint(entityId);
+
+        HttpRequest request = HttpRequest.newBuilder(endpoint)
             .timeout(Duration.ofSeconds(10))
             .header("Authorization", "Bearer " + settings.accessToken())
             .header("Content-Type", "application/json")
@@ -71,7 +74,7 @@ public final class RestTransport implements HomeAssistantTransport {
         try {
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() < 200 || response.statusCode() >= 300) {
-                lastError = "http " + response.statusCode() + ": " + response.body();
+                lastError = "http " + response.statusCode() + " on " + endpoint + ": " + response.body();
                 state = TransportState.DEGRADED;
                 return Optional.empty();
             }
@@ -101,6 +104,8 @@ public final class RestTransport implements HomeAssistantTransport {
             return ServiceCallResult.fail(mode(), "rest transport is not connected");
         }
 
+        var endpoint = settings.serviceEndpoint(serviceCall.domain(), serviceCall.service());
+
         JsonObject payload = new JsonObject();
         if (!serviceCall.data().isEmpty()) {
             payload.add("data", GSON.toJsonTree(serviceCall.data()));
@@ -109,7 +114,7 @@ public final class RestTransport implements HomeAssistantTransport {
             payload.add("target", GSON.toJsonTree(serviceCall.target()));
         }
 
-        HttpRequest request = HttpRequest.newBuilder(settings.serviceEndpoint(serviceCall.domain(), serviceCall.service()))
+        HttpRequest request = HttpRequest.newBuilder(endpoint)
             .timeout(Duration.ofSeconds(10))
             .header("Authorization", "Bearer " + settings.accessToken())
             .header("Content-Type", "application/json")
@@ -122,7 +127,7 @@ public final class RestTransport implements HomeAssistantTransport {
                 state = TransportState.READY;
                 return ServiceCallResult.ok(mode());
             }
-            lastError = "http " + response.statusCode() + ": " + response.body();
+            lastError = "http " + response.statusCode() + " on " + endpoint + ": " + response.body();
             state = TransportState.DEGRADED;
             return ServiceCallResult.fail(mode(), lastError);
         } catch (IOException | InterruptedException ex) {

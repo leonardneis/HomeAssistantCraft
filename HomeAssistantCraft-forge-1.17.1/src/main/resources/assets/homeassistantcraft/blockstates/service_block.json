@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "homeassistantcraft:block/service_block"
+    }
+  }
+}

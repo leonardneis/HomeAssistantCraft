@@ -17,9 +17,9 @@ public final class ModItems {
         () -> new BlockItem(ModBlocks.STATE_BLOCK.get(),
             new Item.Properties().tab(CreativeModeTab.TAB_REDSTONE)));
 
-    public static final RegistryObject<Item> DEV_TEST_BLOCK_ITEM = ITEMS.register("dev_test_block",
-        () -> new BlockItem(ModBlocks.DEV_TEST_BLOCK.get(),
-            new Item.Properties().tab(CreativeModeTab.TAB_BUILDING_BLOCKS)));
+    public static final RegistryObject<Item> SERVICE_BLOCK_ITEM = ITEMS.register("service_block",
+        () -> new BlockItem(ModBlocks.SERVICE_BLOCK.get(),
+            new Item.Properties().tab(CreativeModeTab.TAB_REDSTONE)));
 
     private ModItems() {
     }
