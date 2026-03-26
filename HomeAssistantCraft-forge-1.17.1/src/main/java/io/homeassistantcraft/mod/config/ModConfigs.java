@@ -58,10 +58,24 @@ public final class ModConfigs {
 
         String token = resolveToken();
         if (token.isEmpty()) {
-            return Optional.empty();
+            if (isLocalHost(uri.getHost())) {
+                token = "dev-local-token";
+            } else {
+                return Optional.empty();
+            }
         }
 
         return Optional.of(new HomeAssistantConnectionSettings(uri, token));
+    }
+
+    private static boolean isLocalHost(String host) {
+        if (host == null) {
+            return false;
+        }
+
+        return "localhost".equalsIgnoreCase(host)
+            || "127.0.0.1".equals(host)
+            || "::1".equals(host);
     }
 
     private static String resolveToken() {

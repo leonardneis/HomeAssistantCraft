@@ -1,0 +1,14 @@
+{
+  "name": "fake-ha-sim",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal Home Assistant API simulator (REST + WebSocket)",
+  "main": "fake-ha.js",
+  "scripts": {
+    "start": "node fake-ha.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "ws": "^8.18.0"
+  }
+}
