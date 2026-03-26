@@ -9,6 +9,9 @@ build/
 # VSCode
 .vscode/
 
+# Forge run env
+run/
+
 # OS
 .DS_Store
 Thumbs.db

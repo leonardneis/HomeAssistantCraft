@@ -6,6 +6,7 @@ import io.homeassistantcraft.mod.ha.model.ServiceCallResult;
 import io.homeassistantcraft.mod.ha.transport.HomeAssistantTransport;
 import io.homeassistantcraft.mod.ha.transport.TransportMode;
 import io.homeassistantcraft.mod.ha.transport.TransportState;
+import java.util.Optional;
 
 public final class WebSocketTransport implements HomeAssistantTransport {
     private TransportState state = TransportState.DISCONNECTED;
@@ -28,6 +29,11 @@ public final class WebSocketTransport implements HomeAssistantTransport {
     @Override
     public TransportState state() {
         return state;
+    }
+
+    @Override
+    public Optional<String> fetchEntityState(String entityId) {
+        return Optional.empty();
     }
 
     @Override

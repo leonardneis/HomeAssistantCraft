@@ -1,0 +1,9 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "homeassistantcraft:block/state_block"
+      }
+    }
+  ]
+}

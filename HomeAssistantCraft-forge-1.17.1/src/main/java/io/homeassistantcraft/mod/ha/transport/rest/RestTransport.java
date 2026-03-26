@@ -13,9 +13,13 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.Optional;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 public final class RestTransport implements HomeAssistantTransport {
     private static final Gson GSON = new Gson();
+    private static final Logger LOGGER = LogManager.getLogger();
 
     private final HttpClient httpClient = HttpClient.newBuilder()
         .connectTimeout(Duration.ofSeconds(8))
@@ -46,6 +50,48 @@ public final class RestTransport implements HomeAssistantTransport {
     @Override
     public TransportState state() {
         return state;
+    }
+
+    @Override
+    public Optional<String> fetchEntityState(String entityId) {
+        if (state != TransportState.READY || settings == null) {
+            return Optional.empty();
+        }
+
+        HttpRequest request = HttpRequest.newBuilder(settings.stateEndpoint(entityId))
+            .timeout(Duration.ofSeconds(10))
+            .header("Authorization", "Bearer " + settings.accessToken())
+            .header("Content-Type", "application/json")
+            .GET()
+            .build();
+
+        try {
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() < 200 || response.statusCode() >= 300) {
+                lastError = "http " + response.statusCode() + ": " + response.body();
+                state = TransportState.DEGRADED;
+                LOGGER.warn("REST fetchEntityState failed for '{}': {}", entityId, lastError);
+                return Optional.empty();
+            }
+
+            JsonObject responseJson = GSON.fromJson(response.body(), JsonObject.class);
+            if (responseJson == null || !responseJson.has("state") || responseJson.get("state").isJsonNull()) {
+                lastError = "invalid response body";
+                state = TransportState.DEGRADED;
+                LOGGER.warn("REST fetchEntityState returned invalid payload for '{}': {}", entityId, response.body());
+                return Optional.empty();
+            }
+
+            return Optional.of(responseJson.get("state").getAsString());
+        } catch (IOException | InterruptedException ex) {
+            if (ex instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            lastError = ex.getMessage() == null ? ex.getClass().getSimpleName() : ex.getMessage();
+            state = TransportState.DEGRADED;
+            LOGGER.warn("REST fetchEntityState error for '{}': {}", entityId, lastError);
+            return Optional.empty();
+        }
     }
 
     @Override

@@ -3,6 +3,7 @@ package io.homeassistantcraft.mod.ha.transport;
 import io.homeassistantcraft.mod.ha.HomeAssistantConnectionSettings;
 import io.homeassistantcraft.mod.ha.model.ServiceCall;
 import io.homeassistantcraft.mod.ha.model.ServiceCallResult;
+import java.util.Optional;
 
 public interface HomeAssistantTransport {
     TransportMode mode();
@@ -12,6 +13,8 @@ public interface HomeAssistantTransport {
     void disconnect();
 
     TransportState state();
+
+    Optional<String> fetchEntityState(String entityId);
 
     ServiceCallResult callService(ServiceCall serviceCall);
 

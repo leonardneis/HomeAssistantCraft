@@ -17,11 +17,21 @@ This module is the clean reimplementation target for HomeAssistantCraft.
 - Initial diagnostics commands
   - `/hass status`
   - `/hass list` (cache count placeholder)
+- Working minimal State Block vertical slice
+  - placeable block, registered and visible in creative inventory
+  - hardcoded Home Assistant entity polling over REST
+  - redstone output: 15 when state is `on`, otherwise 0
+  - safe failure handling with logging
+- Simple dev test block
+  - registered and visible in creative inventory
+  - placeholder stone-based model/texture
+- Dev runtime validated
+  - `runClient` launches, world loads, and mod startup log is emitted
 
 ## Next Steps
 
-1. Implement WebSocket transport lifecycle (auth, state sync, event subscription, reconnect backoff).
-2. Add typed service payload validation and command-side test endpoint.
-3. Implement State Block and Service Block block-entity architecture.
+1. Replace hardcoded entity id with block-level configuration storage.
+2. Add UI for State Block and Service Block configuration.
+3. Implement WebSocket transport lifecycle (auth, state sync, event subscription, reconnect backoff).
 4. Add packet layer for client screens and server validation.
-5. Replace command placeholders with full entity pagination and diagnostics.
+5. Expand command diagnostics with entity state inspection and transport health details.
