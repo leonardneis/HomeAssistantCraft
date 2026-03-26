@@ -1,7 +1,9 @@
 package io.homeassistantcraft.mod.block;
 
+import io.homeassistantcraft.mod.block.entity.ServiceBlockEntity;
 import io.homeassistantcraft.mod.ha.model.ServiceCall;
 import io.homeassistantcraft.mod.ha.model.ServiceCallResult;
+import io.homeassistantcraft.mod.init.ModBlockEntities;
 import io.homeassistantcraft.mod.runtime.HomeAssistantServices;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -9,20 +11,19 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-public final class ServiceBlock extends Block {
+public final class ServiceBlock extends BaseEntityBlock {
     private static final Logger LOGGER = LogManager.getLogger();
 
     private static final int TRIGGER_COOLDOWN_TICKS = 10;
-    private static final String HARDCODED_DOMAIN = "light";
-    private static final String HARDCODED_SERVICE = "toggle";
-    private static final String HARDCODED_ENTITY_ID = "light.living_room";
 
     private static final BooleanProperty POWERED = BlockStateProperties.POWERED;
     private static final Map<String, Long> LAST_TRIGGER_TICK = new ConcurrentHashMap<>();
@@ -69,6 +70,11 @@ public final class ServiceBlock extends Block {
     }
 
     @Override
+    public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
+        return ModBlockEntities.SERVICE_BLOCK_ENTITY.get().create(pos, state);
+    }
+
+    @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
         builder.add(POWERED);
     }
@@ -99,11 +105,21 @@ public final class ServiceBlock extends Block {
     }
 
     private void triggerServiceCall(Level level, BlockPos pos) {
+        ServiceBlockEntity serviceBlockEntity = getServiceBlockEntity(level, pos);
+        if (serviceBlockEntity == null) {
+            LOGGER.warn("ServiceBlock trigger failed at {}: missing block entity", pos);
+            return;
+        }
+
+        String domain = serviceBlockEntity.domain();
+        String service = serviceBlockEntity.service();
+        String entityId = serviceBlockEntity.entityId();
+
         ServiceCall call = new ServiceCall(
-            HARDCODED_DOMAIN,
-            HARDCODED_SERVICE,
+            domain,
+            service,
             Map.of(),
-            Map.of("entity_id", HARDCODED_ENTITY_ID)
+            Map.of("entity_id", entityId)
         );
 
         ServiceCallResult result = HomeAssistantServices.transportManager().callService(call);
@@ -111,9 +127,9 @@ public final class ServiceBlock extends Block {
             LOGGER.info(
                 "ServiceBlock trigger at {}: {}.{} -> {} via {}",
                 pos,
-                HARDCODED_DOMAIN,
-                HARDCODED_SERVICE,
-                HARDCODED_ENTITY_ID,
+                domain,
+                service,
+                entityId,
                 result.mode().name().toLowerCase()
             );
             return;
@@ -122,12 +138,20 @@ public final class ServiceBlock extends Block {
         LOGGER.warn(
             "ServiceBlock trigger failed at {}: {}.{} -> {} (mode={} reason={})",
             pos,
-            HARDCODED_DOMAIN,
-            HARDCODED_SERVICE,
-            HARDCODED_ENTITY_ID,
+            domain,
+            service,
+            entityId,
             result.mode().name().toLowerCase(),
             result.message()
         );
+    }
+
+    private static ServiceBlockEntity getServiceBlockEntity(Level level, BlockPos pos) {
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (!(blockEntity instanceof ServiceBlockEntity serviceBlockEntity)) {
+            return null;
+        }
+        return serviceBlockEntity;
     }
 
     private static String cooldownKey(Level level, BlockPos pos) {

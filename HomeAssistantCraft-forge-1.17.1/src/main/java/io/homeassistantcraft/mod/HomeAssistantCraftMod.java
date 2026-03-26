@@ -1,6 +1,7 @@
 package io.homeassistantcraft.mod;
 
 import io.homeassistantcraft.mod.config.ModConfigs;
+import io.homeassistantcraft.mod.init.ModBlockEntities;
 import io.homeassistantcraft.mod.init.ModBlocks;
 import io.homeassistantcraft.mod.init.ModItems;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -17,6 +18,7 @@ public final class HomeAssistantCraftMod {
     public HomeAssistantCraftMod() {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModBlocks.register(modBus);
+        ModBlockEntities.register(modBus);
         ModItems.register(modBus);
         ModConfigs.register();
 

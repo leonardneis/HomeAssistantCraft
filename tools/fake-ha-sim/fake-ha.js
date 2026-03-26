@@ -105,7 +105,9 @@ app.post('/toggle', (req, res) => {
 });
 
 // HA-compatible service path used by the mod transport layer.
-app.post('/api/services/light/toggle', (req, res) => {
+app.post('/api/services/:domain/:service', (req, res) => {
+  const domain = String(req.params.domain || '');
+  const service = String(req.params.service || '');
   const entityId =
     req.body?.target?.entity_id ||
     req.body?.data?.entity_id ||
@@ -113,7 +115,12 @@ app.post('/api/services/light/toggle', (req, res) => {
     'light.living_room';
 
   const normalizedEntityId = String(entityId);
-  const next = toggleEntity(normalizedEntityId);
+  log('service call', `${domain}.${service}`, normalizedEntityId);
+
+  let next = entities.get(normalizedEntityId) || 'off';
+  if (service === 'toggle') {
+    next = toggleEntity(normalizedEntityId);
+  }
 
   res.json([
     {
