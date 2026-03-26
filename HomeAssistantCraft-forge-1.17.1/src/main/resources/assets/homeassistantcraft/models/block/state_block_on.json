@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "homeassistantcraft:blocks/state_block_top",
+    "down": "homeassistantcraft:blocks/state_block_top",
+    "up": "homeassistantcraft:blocks/state_block_top",
+    "north": "homeassistantcraft:blocks/state_block_side_on",
+    "south": "homeassistantcraft:blocks/state_block_side_on",
+    "east": "homeassistantcraft:blocks/state_block_side_on",
+    "west": "homeassistantcraft:blocks/state_block_side_on"
+  }
+}

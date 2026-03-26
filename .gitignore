@@ -9,6 +9,12 @@ build/
 # VSCode
 .vscode/
 
+# Forge run env
+run/
+
+# bin
+bin/
+
 # OS
 .DS_Store
 Thumbs.db

@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "powered=false": {
+      "model": "homeassistantcraft:block/service_block"
+    },
+    "powered=true": {
+      "model": "homeassistantcraft:block/service_block"
+    }
+  }
+}

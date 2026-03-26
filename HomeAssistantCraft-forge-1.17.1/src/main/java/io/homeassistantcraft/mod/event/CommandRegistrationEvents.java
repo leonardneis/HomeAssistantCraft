@@ -1,0 +1,182 @@
+package io.homeassistantcraft.mod.event;
+
+import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.context.CommandContext;
+import io.homeassistantcraft.mod.HomeAssistantCraftMod;
+import io.homeassistantcraft.mod.block.entity.ServiceBlockEntity;
+import io.homeassistantcraft.mod.debug.DebugSettings;
+import io.homeassistantcraft.mod.debug.DebugRuntimeState;
+import io.homeassistantcraft.mod.init.ModBlocks;
+import io.homeassistantcraft.mod.runtime.HomeAssistantServices;
+import net.minecraft.core.BlockPos;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.TextComponent;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.phys.BlockHitResult;
+import net.minecraft.world.phys.HitResult;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.event.RegisterCommandsEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
+import net.minecraftforge.registries.ForgeRegistries;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
+
+@Mod.EventBusSubscriber(modid = HomeAssistantCraftMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+public final class CommandRegistrationEvents {
+    private static final Logger LOGGER = LogManager.getLogger();
+
+    private CommandRegistrationEvents() {
+    }
+
+    @SubscribeEvent
+    public static void onRegisterCommands(RegisterCommandsEvent event) {
+        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+
+        dispatcher.register(Commands.literal("hass")
+            .then(Commands.literal("status")
+                .executes(CommandRegistrationEvents::runStatus))
+            .then(Commands.literal("list")
+                .executes(CommandRegistrationEvents::runListPlaceholder)));
+
+        dispatcher.register(Commands.literal("hac")
+            .then(Commands.literal("set")
+                .then(Commands.argument("x", IntegerArgumentType.integer())
+                    .then(Commands.argument("y", IntegerArgumentType.integer())
+                        .then(Commands.argument("z", IntegerArgumentType.integer())
+                            .then(Commands.argument("domain", StringArgumentType.word())
+                                .then(Commands.argument("service", StringArgumentType.word())
+                                    .then(Commands.argument("entity_id", StringArgumentType.word())
+                                        .executes(CommandRegistrationEvents::runSetServiceBlockConfig))))))))
+            .then(Commands.literal("settarget")
+                .then(Commands.argument("domain", StringArgumentType.word())
+                    .then(Commands.argument("service", StringArgumentType.word())
+                        .then(Commands.argument("entity_id", StringArgumentType.word())
+                            .executes(CommandRegistrationEvents::runSetServiceBlockConfigFromTarget)))))
+            .then(Commands.literal("debug")
+                .then(Commands.literal("on")
+                    .executes(context -> runSetDebug(context, true)))
+                .then(Commands.literal("off")
+                    .executes(context -> runSetDebug(context, false)))));
+    }
+
+    private static int runStatus(CommandContext<CommandSourceStack> context) {
+        String status = HomeAssistantServices.transportManager().statusSummary();
+        context.getSource().sendSuccess(new TextComponent(status), false);
+        return 1;
+    }
+
+    private static int runListPlaceholder(CommandContext<CommandSourceStack> context) {
+        int size = HomeAssistantServices.entityStateCache().size();
+        context.getSource().sendSuccess(new TextComponent("entities in cache=" + size), false);
+        return 1;
+    }
+
+    private static int runSetServiceBlockConfig(CommandContext<CommandSourceStack> context) {
+        int x = IntegerArgumentType.getInteger(context, "x");
+        int y = IntegerArgumentType.getInteger(context, "y");
+        int z = IntegerArgumentType.getInteger(context, "z");
+        String domain = StringArgumentType.getString(context, "domain");
+        String service = StringArgumentType.getString(context, "service");
+        String entityId = StringArgumentType.getString(context, "entity_id");
+
+        return applyServiceBlockConfig(context, new BlockPos(x, y, z), domain, service, entityId);
+    }
+
+    private static int runSetServiceBlockConfigFromTarget(CommandContext<CommandSourceStack> context) {
+        String domain = StringArgumentType.getString(context, "domain");
+        String service = StringArgumentType.getString(context, "service");
+        String entityId = StringArgumentType.getString(context, "entity_id");
+
+        BlockPos targetPos = findLookedAtServiceBlock(context.getSource());
+        if (targetPos == null) {
+            context.getSource().sendFailure(new TextComponent(
+                "hac set failed: look directly at a ServiceBlock within 20 blocks or use /hac set <x> <y> <z> ..."
+            ));
+            return 0;
+        }
+
+        return applyServiceBlockConfig(context, targetPos, domain, service, entityId);
+    }
+
+    private static int applyServiceBlockConfig(
+        CommandContext<CommandSourceStack> context,
+        BlockPos pos,
+        String domain,
+        String service,
+        String entityId
+    ) {
+
+        Level level = context.getSource().getLevel();
+
+        if (!level.isLoaded(pos)) {
+            context.getSource().sendFailure(new TextComponent("hac set failed: chunk not loaded at " + pos));
+            LOGGER.warn("hac set failed at {}: chunk not loaded", pos);
+            return 0;
+        }
+
+        BlockState blockState = level.getBlockState(pos);
+        if (!blockState.is(ModBlocks.SERVICE_BLOCK.get())) {
+            String foundBlockId = String.valueOf(ForgeRegistries.BLOCKS.getKey(blockState.getBlock()));
+            context.getSource().sendFailure(new TextComponent(
+                "hac set failed: no ServiceBlock at " + pos + " (found " + foundBlockId
+                    + "). Tip: use F3 Targeted Block coords or /hac settarget <domain> <service> <entity_id>"
+            ));
+            LOGGER.warn("hac set failed at {}: target is not ServiceBlock (found {})", pos, foundBlockId);
+            return 0;
+        }
+
+        BlockEntity blockEntity = level.getBlockEntity(pos);
+        if (!(blockEntity instanceof ServiceBlockEntity serviceBlockEntity)) {
+            context.getSource().sendFailure(new TextComponent("hac set failed: missing ServiceBlockEntity at " + pos));
+            LOGGER.warn("hac set failed at {}: ServiceBlockEntity missing", pos);
+            return 0;
+        }
+
+        serviceBlockEntity.setConfiguration(domain, service, entityId);
+        level.sendBlockUpdated(pos, blockState, blockState, net.minecraft.world.level.block.Block.UPDATE_ALL);
+
+        String message = "hac set success at " + pos + ": " + serviceBlockEntity.domain()
+            + "." + serviceBlockEntity.service() + " -> " + serviceBlockEntity.entityId();
+        context.getSource().sendSuccess(new TextComponent(message), true);
+        LOGGER.info(message);
+        return 1;
+    }
+
+    private static BlockPos findLookedAtServiceBlock(CommandSourceStack source) {
+        if (!(source.getEntity() instanceof ServerPlayer player)) {
+            return null;
+        }
+
+        HitResult hitResult = player.pick(20.0D, 0.0F, false);
+        if (!(hitResult instanceof BlockHitResult blockHitResult)) {
+            return null;
+        }
+
+        BlockPos pos = blockHitResult.getBlockPos();
+        Level level = source.getLevel();
+        if (!level.isLoaded(pos)) {
+            return null;
+        }
+
+        if (!level.getBlockState(pos).is(ModBlocks.SERVICE_BLOCK.get())) {
+            return null;
+        }
+
+        return pos;
+    }
+
+    private static int runSetDebug(CommandContext<CommandSourceStack> context, boolean enabled) {
+        DebugSettings.setEnabled(enabled);
+        DebugRuntimeState.syncToAllPlayers();
+        String message = "hac debug " + (enabled ? "on" : "off");
+        context.getSource().sendSuccess(new TextComponent(message), true);
+        LOGGER.info("Debug logging toggled: {}", enabled ? "on" : "off");
+        return 1;
+    }
+}
