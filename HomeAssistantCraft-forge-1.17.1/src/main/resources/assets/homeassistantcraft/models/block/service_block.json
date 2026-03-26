@@ -1,5 +1,5 @@
 {
-  "parent": "minecraft:block/cube",
+  "parent": "block/cube",
   "textures": {
     "particle": "homeassistantcraft:blocks/service_block_top",
     "down": "homeassistantcraft:blocks/service_block_top",

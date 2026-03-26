@@ -7,6 +7,7 @@ import com.mojang.brigadier.context.CommandContext;
 import io.homeassistantcraft.mod.HomeAssistantCraftMod;
 import io.homeassistantcraft.mod.block.entity.ServiceBlockEntity;
 import io.homeassistantcraft.mod.debug.DebugSettings;
+import io.homeassistantcraft.mod.debug.DebugRuntimeState;
 import io.homeassistantcraft.mod.init.ModBlocks;
 import io.homeassistantcraft.mod.runtime.HomeAssistantServices;
 import net.minecraft.core.BlockPos;
@@ -172,6 +173,7 @@ public final class CommandRegistrationEvents {
 
     private static int runSetDebug(CommandContext<CommandSourceStack> context, boolean enabled) {
         DebugSettings.setEnabled(enabled);
+        DebugRuntimeState.syncToAllPlayers();
         String message = "hac debug " + (enabled ? "on" : "off");
         context.getSource().sendSuccess(new TextComponent(message), true);
         LOGGER.info("Debug logging toggled: {}", enabled ? "on" : "off");

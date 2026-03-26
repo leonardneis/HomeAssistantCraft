@@ -4,6 +4,7 @@ import io.homeassistantcraft.mod.config.ModConfigs;
 import io.homeassistantcraft.mod.init.ModBlockEntities;
 import io.homeassistantcraft.mod.init.ModBlocks;
 import io.homeassistantcraft.mod.init.ModItems;
+import io.homeassistantcraft.mod.network.ModNetwork;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
@@ -16,6 +17,8 @@ public final class HomeAssistantCraftMod {
     private static final Logger LOGGER = LogManager.getLogger();
 
     public HomeAssistantCraftMod() {
+        ModNetwork.register();
+
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         ModBlocks.register(modBus);
         ModBlockEntities.register(modBus);

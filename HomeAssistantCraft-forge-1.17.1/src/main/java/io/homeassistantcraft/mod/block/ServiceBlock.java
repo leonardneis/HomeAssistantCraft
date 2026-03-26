@@ -2,14 +2,18 @@ package io.homeassistantcraft.mod.block;
 
 import io.homeassistantcraft.mod.block.entity.ServiceBlockEntity;
 import io.homeassistantcraft.mod.debug.DebugSettings;
+import io.homeassistantcraft.mod.debug.DebugRuntimeState;
 import io.homeassistantcraft.mod.ha.model.ServiceCall;
 import io.homeassistantcraft.mod.ha.model.ServiceCallResult;
 import io.homeassistantcraft.mod.init.ModBlockEntities;
+import io.homeassistantcraft.mod.network.ModNetwork;
+import io.homeassistantcraft.mod.network.packet.OpenServiceBlockScreenPacket;
 import io.homeassistantcraft.mod.runtime.HomeAssistantServices;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
@@ -101,16 +105,13 @@ public final class ServiceBlock extends BaseEntityBlock {
             return InteractionResult.CONSUME;
         }
 
-        String configMessage = "ServiceBlock: " + serviceBlockEntity.domain() + "."
-            + serviceBlockEntity.service() + " -> " + serviceBlockEntity.entityId();
-        player.sendMessage(new TextComponent(configMessage), Util.NIL_UUID);
-
-        if (player.isShiftKeyDown()) {
-            Long lastTriggerTick = LAST_TRIGGER_TICK.get(cooldownKey(level, pos));
-            String triggerMessage = lastTriggerTick == null
-                ? "ServiceBlock: never triggered"
-                : "ServiceBlock: last trigger tick=" + lastTriggerTick;
-            player.sendMessage(new TextComponent(triggerMessage), Util.NIL_UUID);
+        if (player instanceof ServerPlayer serverPlayer) {
+            ModNetwork.sendToPlayer(new OpenServiceBlockScreenPacket(
+                pos,
+                serviceBlockEntity.domain(),
+                serviceBlockEntity.service(),
+                serviceBlockEntity.entityId()
+            ), serverPlayer);
         }
 
         return InteractionResult.CONSUME;
@@ -154,6 +155,7 @@ public final class ServiceBlock extends BaseEntityBlock {
     private void triggerServiceCall(Level level, BlockPos pos) {
         ServiceBlockEntity serviceBlockEntity = getServiceBlockEntity(level, pos);
         if (serviceBlockEntity == null) {
+            DebugRuntimeState.recordServiceCallResult("failed: missing ServiceBlockEntity at " + pos);
             if (DebugSettings.isEnabled()) {
                 LOGGER.warn("ServiceBlock trigger failed at {}: missing block entity", pos);
                 DebugSettings.broadcastToPlayers(level, "HA call failed: missing ServiceBlockEntity at " + pos);
@@ -174,6 +176,10 @@ public final class ServiceBlock extends BaseEntityBlock {
 
         ServiceCallResult result = HomeAssistantServices.transportManager().callService(call);
         if (result.success()) {
+            DebugRuntimeState.recordServiceCallResult(
+                "success: " + domain + "." + service + " -> " + entityId + " ("
+                    + result.mode().name().toLowerCase() + ")"
+            );
             if (DebugSettings.isEnabled()) {
                 LOGGER.info(
                     "ServiceBlock trigger at {}: {}.{} -> {} via {}",
@@ -190,6 +196,11 @@ public final class ServiceBlock extends BaseEntityBlock {
             }
             return;
         }
+
+        DebugRuntimeState.recordServiceCallResult(
+            "failed: " + domain + "." + service + " -> " + entityId + " ("
+                + result.mode().name().toLowerCase() + ", " + result.message() + ")"
+        );
 
         if (DebugSettings.isEnabled()) {
             LOGGER.warn(

@@ -1,6 +1,7 @@
 package io.homeassistantcraft.mod.runtime;
 
 import io.homeassistantcraft.mod.ha.cache.EntityStateCache;
+import io.homeassistantcraft.mod.debug.DebugRuntimeState;
 import io.homeassistantcraft.mod.ha.transport.TransportManager;
 import java.util.Map;
 import java.util.Optional;
@@ -65,6 +66,7 @@ public final class HomeAssistantPollingService {
                 Optional<String> latestState = transportManager.getState(entityId);
                 if (latestState.isPresent()) {
                     entityStateCache.updateState(entityId, latestState.get());
+                    DebugRuntimeState.recordHaState(entityId, latestState.get());
                     if (failureLoggedByEntity.remove(entityId) != null) {
                         LOGGER.info("Recovered Home Assistant polling for entity '{}'", entityId);
                     }
